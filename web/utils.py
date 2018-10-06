@@ -521,18 +521,7 @@ def group(seq, size):
         >>> list(group([1,2,3,4,5], 2))
         [[1, 2], [3, 4], [5]]
     """
-    def take(seq, n):
-        for i in range(n):
-            yield next(seq)
-
-    if not hasattr(seq, 'next'):  
-        seq = iter(seq)
-    while True: 
-        x = list(take(seq, size))
-        if x:
-            yield x
-        else:
-            break
+    return (seq[i:i+size] for i in range(0, len(seq), size))
 
 def uniq(seq, key=None):
     """
@@ -665,8 +654,11 @@ class IterBetter:
         if hasattr(self, "_head"):
             yield self._head
 
-        while 1:    
-            yield next(self.i)
+        while 1:
+            try:
+                yield next(self.i)
+            except StopIteration:
+                return
             self.c += 1
 
     def __getitem__(self, i):
@@ -913,11 +905,9 @@ def datestr(then, now=None):
         if abs(deltadays) < 4:
             return agohence(deltadays, 'day')
 
-        try:
-            out = then.strftime('%B %e') # e.g. 'June  3'
-        except ValueError:
-            # %e doesn't work on Windows.
-            out = then.strftime('%B %d') # e.g. 'June 03'
+        # Trick to display 'June 3' instead of 'June 03'
+        # Even though the %e format in strftime does that, it doesn't work on Windows.
+        out = then.strftime('%B %d').replace(" 0", "  ")
 
         if then.year != now.year or deltadays < 0:
             out += ', %s' % then.year
@@ -976,6 +966,8 @@ def commify(n):
         '1'
         >>> commify(123)
         '123'
+        >>> commify(-123)
+        '-123'
         >>> commify(1234)
         '1,234'
         >>> commify(1234567890)
@@ -986,14 +978,21 @@ def commify(n):
         '1,234.5'
         >>> commify(1234.56789)
         '1,234.56789'
-        >>> commify('%.2f' % 1234.5)
-        '1,234.50'
+        >>> commify(' %.2f ' % -1234.5)
+        '-1,234.50'
         >>> commify(None)
         >>>
 
     """
     if n is None: return None
-    n = str(n)
+    n = str(n).strip()
+
+    if n.startswith('-'):
+        prefix = '-'
+        n = n[1:].strip()
+    else:
+        prefix = ''
+
     if '.' in n:
         dollars, cents = n.split('.')
     else:
@@ -1007,7 +1006,7 @@ def commify(n):
     out = ''.join(r)
     if cents:
         out += '.' + cents
-    return out
+    return prefix + out
 
 def dateify(datestring):
     """

@@ -28,6 +28,7 @@ Grammar:
     pyexpr -> <python expression>
 """
 from __future__ import print_function
+from io import open
 
 __all__ = [
     "Template",
@@ -925,7 +926,7 @@ class Template(BaseTemplate):
 
         def get_source_line(filename, lineno):
             try:
-                lines = open(filename).read().splitlines()
+                lines = open(filename, encoding='utf-8').read().splitlines()
                 return lines[lineno]
             except:
                 return None
@@ -1013,15 +1014,21 @@ class Render:
         if kind == 'dir':
             return Render(path, cache=self._cache is not None, base=self._base, **self._keywords)
         elif kind == 'file':
-            return Template(open(path).read(), filename=path, **self._keywords)
+            return Template(open(path, encoding='utf-8').read(), filename=path, **self._keywords)
         else:
             raise AttributeError("No template named " + name)
 
-    def _findfile(self, path_prefix): 
+    def _findfile(self, path_prefix):
         p = [f for f in glob.glob(path_prefix + '.*') if not f.endswith('~')] # skip backup files
         p.sort() # sort the matches for deterministic order
+
+        # support templates without extension (#364)
+        # When no templates are found and a file is found with the exact name, use it.
+        if not p and os.path.exists(path_prefix):
+            p = [path_prefix]
+
         return p and p[0]
-            
+
     def _template(self, name):
         if self._cache is not None:
             if name not in self._cache:
@@ -1075,7 +1082,7 @@ except ImportError:
 def frender(path, **keywords):
     """Creates a template from the given file path.
     """
-    return Template(open(path).read(), filename=path, **keywords)
+    return Template(open(path, encoding='utf-8').read(), filename=path, **keywords)
     
 def compile_templates(root):
     """Compiles templates to python code."""
@@ -1088,7 +1095,7 @@ def compile_templates(root):
             if d.startswith('.'):
                 dirnames.remove(d) # don't visit this dir
 
-        out = open(os.path.join(dirpath, '__init__.py'), 'w')
+        out = open(os.path.join(dirpath, '__init__.py'), 'w', encoding='utf-8')
         out.write('from web.template import CompiledTemplate, ForLoop, TemplateResult\n\n')
         if dirnames:
             out.write("import " + ", ".join(dirnames))
@@ -1102,7 +1109,7 @@ def compile_templates(root):
             else:
                 name = f
                 
-            text = open(path).read()
+            text = open(path, encoding='utf-8').read()
             text = Template.normalize_text(text)
             code = Template.generate_code(text, path)
 
@@ -1115,7 +1122,7 @@ def compile_templates(root):
             out.write("join_ = %s._join; escape_ = %s._escape\n\n" % (name, name))
 
             # create template to make sure it compiles
-            t = Template(open(path).read(), path)
+            t = Template(open(path, encoding='utf-8').read(), path)
         out.close()
                 
 class ParseError(Exception):
